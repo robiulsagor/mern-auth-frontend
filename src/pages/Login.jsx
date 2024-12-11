@@ -1,9 +1,16 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { assets } from "../assets/assets";
+import { AppContext } from "../context/AppContext";
+import { toast } from "react-hot-toast";
+import axios from "axios";
+import apiClient from "../utils/axios";
 
 const Login = () => {
   const navigate = useNavigate();
+  const { isAuthenticated, setIsAuthenticated, backendUrl, getUserData } =
+    useContext(AppContext);
 
   const [state, setState] = useState("login");
   const [inputData, setInputData] = useState({
@@ -11,11 +18,71 @@ const Login = () => {
     email: "",
     password: "",
   });
+  const [loading, setLoading] = useState(false);
 
-  const submitHandler = (e) => {
-    e.preventDefault();
-    alert("Submitting...");
+  const [passType, setPassType] = useState("password");
+  const showPass = () => {
+    setPassType(() => (passType === "password" ? "text" : "password"));
   };
+
+  const submitHandler = async (e) => {
+    e.preventDefault();
+
+    try {
+      setLoading(true);
+
+      if (state === "register") {
+        // error check
+        if (!inputData.name || !inputData.email || !inputData.password) {
+          toast.error("Please fill in all fields");
+          return;
+        }
+
+        const { data } = await axios.post(
+          `${backendUrl}/api/auth/register`,
+          inputData
+        );
+
+        if (data.success) {
+          setIsAuthenticated(true);
+          toast.success("User created successfully");
+          getUserData();
+          navigate("/");
+        } else {
+          toast.error(data.message || "Error");
+        }
+      }
+
+      if (state === "login") {
+        // error check
+        if (!inputData.email || !inputData.password) {
+          toast.error("Please fill in all fields");
+          return;
+        }
+
+        const { data } = await apiClient.post("/api/auth/login", inputData);
+
+        if (data.success) {
+          setIsAuthenticated(true);
+          getUserData();
+          navigate("/");
+          toast.success("Logged in successfully");
+        } else {
+          toast.error(data.message || "Error logging in");
+        }
+      }
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Error!", {
+        id: "errorToast",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    isAuthenticated && navigate("/");
+  }, []);
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-blue-200 to-purple-400 flex items-center justify-center">
@@ -43,6 +110,7 @@ const Login = () => {
               <img src={assets.person_icon} className="w-4" alt="" />
               <input
                 type="text"
+                name="name"
                 value={inputData.name}
                 onChange={(e) =>
                   setInputData({
@@ -62,6 +130,7 @@ const Login = () => {
             <img src={assets.mail_icon} className="w-4" alt="" />
             <input
               type="email"
+              name="email"
               value={inputData.email}
               onChange={(e) =>
                 setInputData({
@@ -79,7 +148,8 @@ const Login = () => {
           <div className=" mb-4 flex items-center bg-gray-700 px-4 py-2 rounded-full">
             <img src={assets.lock_icon} className="w-4" alt="" />
             <input
-              type="password"
+              type={passType}
+              name="password"
               value={inputData.password}
               onChange={(e) =>
                 setInputData({
@@ -91,12 +161,18 @@ const Login = () => {
               placeholder="Enter Password"
               required
             />
+            <img
+              src={passType === "password" ? assets.eyeOpen : assets.eyeClose}
+              className="w-6 cursor-pointer"
+              onClick={showPass}
+              alt=""
+            />
           </div>
 
           {state === "login" && (
             <p
               onClick={() => navigate("/reset-password")}
-              className="text-indigo-500 cursor-pointer hover:underline"
+              className="text-indigo-500 cursor-pointer hover:underline w-max"
             >
               Forgot your password?{" "}
             </p>
@@ -104,9 +180,10 @@ const Login = () => {
 
           <button
             type="submit"
-            className="bg-gradient-to-r from-indigo-300 to-indigo-800 hover:from-indigo-400 hover:to-indigo-900 transition-all w-full mt-4 py-2 rounded-full text-lg"
+            className="disabled:bg-red-400  bg-gradient-to-r from-indigo-300 to-indigo-800 hover:from-indigo-400 hover:to-indigo-900 transition-all w-full mt-4 py-2 rounded-full text-lg disabled:cursor-not-allowed "
+            disabled={loading && true}
           >
-            {state === "login" ? "Login" : "Sign Up"}
+            {loading ? "Loading..." : state === "login" ? "Login" : "Sign Up"}
           </button>
         </form>
 
